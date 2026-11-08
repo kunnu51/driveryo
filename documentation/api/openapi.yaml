@@ -1,0 +1,1126 @@
+openapi: "3.0.3"
+info:
+  title: "DRIVERYO Platform API"
+  description: "Production REST API for Driveryo on-demand chauffeur booking service for customer-owned vehicles in Hyderabad, India."
+  version: "1.0.0"
+  contact:
+    name: "Driveryo Engineering Team"
+    email: "dev@driveryo.com"
+    url: "https://driveryo.com"
+  license:
+    name: "Proprietary"
+    url: "https://driveryo.com/terms"
+servers:
+  -
+    url: "http://localhost:3000/api/v1"
+    description: "Local Development Server"
+  -
+    url: "https://api.driveryo.com/api/v1"
+    description: "Production Cloud Server (Hyderabad AWS ap-south-1)"
+tags:
+  -
+    name: "auth"
+    description: "Passwordless mobile OTP authentication & JWT issuance"
+  -
+    name: "pricing"
+    description: "Dynamic rate card, surcharge, GST & promo code calculation"
+  -
+    name: "bookings"
+    description: "Customer chauffeur booking lifecycle & status queries"
+  -
+    name: "trips"
+    description: "Trip lifecycle: driver arrival, OTP start, metered completion & ratings"
+  -
+    name: "drivers"
+    description: "Driver registration, live availability, telemetry & earnings ledger"
+  -
+    name: "payments"
+    description: "Razorpay order creation, HMAC signature verification & webhook handlers"
+  -
+    name: "admin"
+    description: "Operations dashboard, driver KYC verification & Hyderabad fleet map"
+  -
+    name: "notifications"
+    description: "Push notification and SMS delivery logs & dispatch"
+paths:
+  /auth/request-otp:
+    post:
+      tags:
+        - "auth"
+      summary: "Request a 6-digit login or registration OTP via SMS"
+      operationId: "requestOtp"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequestOtpDto"
+      responses:
+        200:
+          description: "OTP generated and dispatched successfully via MSG91 SMS gateway"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OtpResponseDto"
+        400:
+          description: "Invalid mobile number format"
+  /auth/verify-otp:
+    post:
+      tags:
+        - "auth"
+      summary: "Verify 6-digit OTP code and retrieve access/refresh tokens"
+      operationId: "verifyOtp"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyOtpDto"
+      responses:
+        200:
+          description: "Authenticated successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSuccessDto"
+        401:
+          description: "Invalid or expired OTP code"
+  /pricing/estimate:
+    post:
+      tags:
+        - "pricing"
+      summary: "Calculate real-time fare estimate with transparent breakdown"
+      operationId: "estimateFare"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FareEstimateRequestDto"
+      responses:
+        200:
+          description: "Detailed fare breakdown including base fare, extra hours, night surcharge, GST, and promo discount"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FareEstimateResponseDto"
+  /bookings/create:
+    post:
+      tags:
+        - "bookings"
+      summary: "Create a new chauffeur booking for a customer-owned vehicle"
+      operationId: "createBooking"
+      security:
+        -
+          bearerAuth:
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBookingDto"
+      responses:
+        201:
+          description: "Booking created, assigned unique bookingNumber and customer 4-digit trip OTP"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingResponseDto"
+  /bookings/{id}:
+    get:
+      tags:
+        - "bookings"
+      summary: "Get details and live status of a specific booking"
+      operationId: "getBookingById"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          description: "Booking ID or Booking Number"
+          schema:
+            type: "string"
+      responses:
+        200:
+          description: "Booking entity with assigned driver details"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingResponseDto"
+        404:
+          description: "Booking not found"
+  /bookings:
+    get:
+      tags:
+        - "bookings"
+      summary: "List bookings with optional status or phone filtering"
+      operationId: "listBookings"
+      parameters:
+        -
+          name: "status"
+          in: "query"
+          schema:
+            type: "string"
+        -
+          name: "phone"
+          in: "query"
+          schema:
+            type: "string"
+      responses:
+        200:
+          description: "Array of booking records"
+          content:
+            application/json:
+              schema:
+                type: "array"
+                items:
+                  $ref: "#/components/schemas/BookingResponseDto"
+  /bookings/{id}/cancel:
+    post:
+      tags:
+        - "bookings"
+      summary: "Cancel a booking before trip start"
+      operationId: "cancelBooking"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CancelBookingDto"
+      responses:
+        200:
+          description: "Booking cancelled"
+          content:
+            application/json:
+              schema:
+                type: "object"
+                properties:
+                  success:
+                    type: "boolean"
+                  status:
+                    type: "string"
+                    example: "CANCELLED"
+                  cancellationFee:
+                    type: "number"
+                    example: 0
+  /trips/{bookingId}/arrive:
+    post:
+      tags:
+        - "trips"
+      summary: "Driver signals arrival at customer vehicle"
+      operationId: "driverArrive"
+      parameters:
+        -
+          name: "bookingId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      responses:
+        200:
+          description: "Driver arrival acknowledged, customer notified to share Trip Start OTP"
+          content:
+            application/json:
+              schema:
+                type: "object"
+                properties:
+                  success:
+                    type: "boolean"
+                  status:
+                    type: "string"
+                    example: "DRIVER_ARRIVED"
+                  message:
+                    type: "string"
+  /trips/{bookingId}/start:
+    post:
+      tags:
+        - "trips"
+      summary: "Driver inputs customer 4-digit OTP to start trip meter"
+      operationId: "startTrip"
+      parameters:
+        -
+          name: "bookingId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartTripDto"
+      responses:
+        200:
+          description: "OTP verified; trip meter activated"
+          content:
+            application/json:
+              schema:
+                type: "object"
+                properties:
+                  success:
+                    type: "boolean"
+                  tripStatus:
+                    type: "string"
+                    example: "IN_PROGRESS"
+                  tripStartedAt:
+                    type: "string"
+                    format: "date-time"
+        400:
+          description: "Invalid OTP provided"
+  /trips/{bookingId}/complete:
+    post:
+      tags:
+        - "trips"
+      summary: "Driver completes trip; calculates duration, waiting charges and final fare"
+      operationId: "completeTrip"
+      parameters:
+        -
+          name: "bookingId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompleteTripDto"
+      responses:
+        200:
+          description: "Trip completed, final bill calculated, digital invoice ready"
+          content:
+            application/json:
+              schema:
+                type: "object"
+                properties:
+                  success:
+                    type: "boolean"
+                  bookingStatus:
+                    type: "string"
+                    example: "COMPLETED"
+                  finalFare:
+                    type: "number"
+                    example: 649
+                  driverEarnings:
+                    type: "number"
+                    example: 519.2
+                  platformCommission:
+                    type: "number"
+                    example: 129.8
+  /trips/{bookingId}/rate:
+    post:
+      tags:
+        - "trips"
+      summary: "Customer rates completed trip (1-5 stars)"
+      operationId: "rateTrip"
+      parameters:
+        -
+          name: "bookingId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RateTripDto"
+      responses:
+        200:
+          description: "Rating recorded and driver aggregate rating updated"
+          content:
+            application/json:
+              schema:
+                type: "object"
+                properties:
+                  success:
+                    type: "boolean"
+                  rating:
+                    type: "number"
+                    example: 5
+  /driver/register:
+    post:
+      tags:
+        - "drivers"
+      summary: "Submit driver partner onboarding application for KYC approval"
+      operationId: "registerDriver"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterDriverDto"
+      responses:
+        201:
+          description: "Driver application created with PENDING verification status"
+          content:
+            application/json:
+              schema:
+                type: "object"
+                properties:
+                  success:
+                    type: "boolean"
+                  driverId:
+                    type: "string"
+                  approvalStatus:
+                    type: "string"
+                    example: "PENDING"
+  /driver/earnings:
+    get:
+      tags:
+        - "drivers"
+      summary: "Get driver partner earnings summary, completed trips, and payout ledger"
+      operationId: "getDriverEarnings"
+      responses:
+        200:
+          description: "Driver earnings breakdown (80% net earnings, 20% commission)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DriverEarningsDto"
+  /driver/availability/toggle:
+    post:
+      tags:
+        - "drivers"
+      summary: "Toggle driver online/offline availability to receive booking requests"
+      operationId: "toggleAvailability"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                isOnline:
+                  type: "boolean"
+                  example: true
+              required:
+                - "isOnline"
+      responses:
+        200:
+          description: "Availability toggled"
+          content:
+            application/json:
+              schema:
+                type: "object"
+                properties:
+                  success:
+                    type: "boolean"
+                  isOnline:
+                    type: "boolean"
+                  message:
+                    type: "string"
+  /driver/location:
+    post:
+      tags:
+        - "drivers"
+      summary: "Broadcast real-time driver GPS telemetry"
+      operationId: "updateDriverLocation"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLocationDto"
+      responses:
+        200:
+          description: "Telemetry recorded"
+          content:
+            application/json:
+              schema:
+                type: "object"
+                properties:
+                  success:
+                    type: "boolean"
+                  timestamp:
+                    type: "string"
+  /payments/create-order:
+    post:
+      tags:
+        - "payments"
+      summary: "Create Razorpay checkout order for booking payment"
+      operationId: "createPaymentOrder"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrderDto"
+      responses:
+        201:
+          description: "Order created with order_id and key_id"
+          content:
+            application/json:
+              schema:
+                type: "object"
+                properties:
+                  orderId:
+                    type: "string"
+                    example: "order_HYD_987654321"
+                  amount:
+                    type: "number"
+                    example: 64900
+                  currency:
+                    type: "string"
+                    example: "INR"
+                  keyId:
+                    type: "string"
+                    example: "rzp_test_DRIVERYO_HYD_KEY"
+  /payments/verify:
+    post:
+      tags:
+        - "payments"
+      summary: "Verify Razorpay HMAC-SHA256 signature after customer payment"
+      operationId: "verifyPayment"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyPaymentDto"
+      responses:
+        200:
+          description: "Payment successfully captured and verified"
+          content:
+            application/json:
+              schema:
+                type: "object"
+                properties:
+                  success:
+                    type: "boolean"
+                  status:
+                    type: "string"
+                    example: "CAPTURED"
+                  message:
+                    type: "string"
+        400:
+          description: "Invalid signature verification failed"
+  /payments/webhook:
+    post:
+      tags:
+        - "payments"
+      summary: "Process incoming Razorpay webhook events"
+      operationId: "handlePaymentWebhook"
+      parameters:
+        -
+          name: "x-razorpay-signature"
+          in: "header"
+          required: true
+          schema:
+            type: "string"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+      responses:
+        200:
+          description: "Webhook received and processed"
+  /admin/dashboard:
+    get:
+      tags:
+        - "admin"
+      summary: "Retrieve executive operations metrics and platform KPIs"
+      operationId: "getAdminDashboardMetrics"
+      security:
+        -
+          bearerAuth:
+
+      responses:
+        200:
+          description: "Dashboard metrics"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminDashboardMetricsDto"
+  /admin/drivers:
+    get:
+      tags:
+        - "admin"
+      summary: "List driver partners with status filter (PENDING, APPROVED, REJECTED)"
+      operationId: "listAdminDrivers"
+      parameters:
+        -
+          name: "status"
+          in: "query"
+          schema:
+            type: "string"
+      security:
+        -
+          bearerAuth:
+
+      responses:
+        200:
+          description: "List of driver profiles"
+          content:
+            application/json:
+              schema:
+                type: "array"
+                items:
+                  type: "object"
+  /admin/drivers/{driverId}/verify:
+    post:
+      tags:
+        - "admin"
+      summary: "Approve or reject a driver KYC application"
+      operationId: "verifyDriverKyc"
+      parameters:
+        -
+          name: "driverId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        -
+          bearerAuth:
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                action:
+                  type: "string"
+                  enum:
+                    - "APPROVE"
+                    - "REJECT"
+                  example: "APPROVE"
+                reason:
+                  type: "string"
+                  example: "Documents verified against Parivahan database"
+              required:
+                - "action"
+      responses:
+        200:
+          description: "Driver status updated"
+          content:
+            application/json:
+              schema:
+                type: "object"
+                properties:
+                  success:
+                    type: "boolean"
+                  approvalStatus:
+                    type: "string"
+  /admin/operations/map:
+    get:
+      tags:
+        - "admin"
+      summary: "Get real-time Hyderabad map telemetry of active drivers and ongoing trips"
+      operationId: "getLiveMapTelemetry"
+      security:
+        -
+          bearerAuth:
+
+      responses:
+        200:
+          description: "City telemetry"
+          content:
+            application/json:
+              schema:
+                type: "object"
+                properties:
+                  city:
+                    type: "string"
+                    example: "Hyderabad"
+                  activeDrivers:
+                    type: "array"
+                    items:
+                      type: "object"
+                  ongoingBookings:
+                    type: "array"
+                    items:
+                      type: "object"
+  /notifications/user/{userId}:
+    get:
+      tags:
+        - "notifications"
+      summary: "Get user notification history"
+      operationId: "getUserNotifications"
+      parameters:
+        -
+          name: "userId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      responses:
+        200:
+          description: "Array of notifications"
+          content:
+            application/json:
+              schema:
+                type: "array"
+                items:
+                  type: "object"
+  /notifications/send-test:
+    post:
+      tags:
+        - "notifications"
+      summary: "Dispatch a test push notification / SMS"
+      operationId: "sendTestNotification"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                title:
+                  type: "string"
+                  example: "Test Notification"
+                message:
+                  type: "string"
+                  example: "Hello from Driveryo!"
+                phone:
+                  type: "string"
+                  example: "+919876543210"
+                fcmToken:
+                  type: "string"
+              required:
+                - "title"
+                - "message"
+      responses:
+        200:
+          description: "Dispatched"
+          content:
+            application/json:
+              schema:
+                type: "object"
+                properties:
+                  success:
+                    type: "boolean"
+                  message:
+                    type: "string"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: "http"
+      scheme: "bearer"
+      bearerFormat: "JWT"
+  schemas:
+    RequestOtpDto:
+      type: "object"
+      properties:
+        phone:
+          type: "string"
+          example: "+919876543210"
+          description: "10-digit Indian mobile number with or without +91 prefix"
+      required:
+        - "phone"
+    OtpResponseDto:
+      type: "object"
+      properties:
+        success:
+          type: "boolean"
+          example: true
+        message:
+          type: "string"
+          example: "OTP sent successfully to +919876543210"
+        expiresInSeconds:
+          type: "number"
+          example: 300
+    VerifyOtpDto:
+      type: "object"
+      properties:
+        phone:
+          type: "string"
+          example: "+919876543210"
+        code:
+          type: "string"
+          example: "123456"
+      required:
+        - "phone"
+        - "code"
+    AuthSuccessDto:
+      type: "object"
+      properties:
+        success:
+          type: "boolean"
+          example: true
+        accessToken:
+          type: "string"
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        user:
+          type: "object"
+          properties:
+            id:
+              type: "string"
+              example: "usr_9876543210"
+            phone:
+              type: "string"
+              example: "+919876543210"
+            role:
+              type: "string"
+              example: "CUSTOMER"
+            fullName:
+              type: "string"
+              example: "Rafi Ahmed"
+    FareEstimateRequestDto:
+      type: "object"
+      properties:
+        serviceCategory:
+          type: "string"
+          enum:
+            - "INSTANT"
+            - "SCHEDULED"
+            - "HOURLY"
+            - "DAILY"
+            - "MONTHLY"
+            - "OUTSTATION"
+          default: "INSTANT"
+        durationHours:
+          type: "number"
+          default: 2.0
+          example: 2.0
+        vehicleTransmission:
+          type: "string"
+          enum:
+            - "MANUAL"
+            - "AUTOMATIC"
+          default: "MANUAL"
+        vehicleCategory:
+          type: "string"
+          enum:
+            - "HATCHBACK"
+            - "SEDAN"
+            - "SUV"
+            - "LUXURY"
+            - "EV"
+          default: "SEDAN"
+        promoCode:
+          type: "string"
+          example: "FIRSTTRIP"
+        startHour:
+          type: "number"
+          example: 14
+      required:
+        - "serviceCategory"
+    FareEstimateResponseDto:
+      type: "object"
+      properties:
+        baseFare:
+          type: "number"
+          example: 349
+        extraHoursFare:
+          type: "number"
+          example: 150
+        nightSurcharge:
+          type: "number"
+          example: 0
+        subtotal:
+          type: "number"
+          example: 499
+        gst:
+          type: "number"
+          example: 89.82
+        discount:
+          type: "number"
+          example: 100
+        estimatedTotal:
+          type: "number"
+          example: 489
+        currency:
+          type: "string"
+          example: "INR"
+    CreateBookingDto:
+      type: "object"
+      properties:
+        customerPhone:
+          type: "string"
+          example: "+919876543210"
+        pickupLocation:
+          type: "string"
+          example: "Cyber Towers, HITEC City, Hyderabad"
+        destinationLocation:
+          type: "string"
+          example: "RGIA Shamshabad Airport, Hyderabad"
+        serviceCategory:
+          type: "string"
+          enum:
+            - "INSTANT"
+            - "SCHEDULED"
+            - "HOURLY"
+            - "DAILY"
+            - "MONTHLY"
+            - "OUTSTATION"
+          default: "INSTANT"
+        durationHours:
+          type: "number"
+          default: 2
+        vehicleTransmission:
+          type: "string"
+          enum:
+            - "MANUAL"
+            - "AUTOMATIC"
+          default: "MANUAL"
+        vehicleCategory:
+          type: "string"
+          enum:
+            - "HATCHBACK"
+            - "SEDAN"
+            - "SUV"
+            - "LUXURY"
+            - "EV"
+          default: "SEDAN"
+        vehicleRegistration:
+          type: "string"
+          example: "TS09FA1234"
+        promoCode:
+          type: "string"
+          example: "FIRSTTRIP"
+        scheduledStartTime:
+          type: "string"
+          format: "date-time"
+      required:
+        - "customerPhone"
+        - "pickupLocation"
+        - "serviceCategory"
+        - "vehicleTransmission"
+        - "vehicleCategory"
+    CancelBookingDto:
+      type: "object"
+      properties:
+        reason:
+          type: "string"
+          example: "Meeting cancelled"
+    BookingResponseDto:
+      type: "object"
+      properties:
+        id:
+          type: "string"
+          example: "bkg_1731000000000"
+        bookingNumber:
+          type: "string"
+          example: "DY-847291"
+        status:
+          type: "string"
+          example: "ASSIGNED"
+        serviceCategory:
+          type: "string"
+          example: "INSTANT"
+        pickupLocation:
+          type: "string"
+          example: "Cyber Towers, HITEC City, Hyderabad"
+        destinationLocation:
+          type: "string"
+          example: "RGIA Airport"
+        otpStartCode:
+          type: "string"
+          example: "4829"
+        estimatedFare:
+          type: "number"
+          example: 649
+        driver:
+          type: "object"
+          properties:
+            id:
+              type: "string"
+              example: "drv_hyd_001"
+            name:
+              type: "string"
+              example: "Ramesh Kumar"
+            phone:
+              type: "string"
+              example: "+919876500001"
+            rating:
+              type: "number"
+              example: 4.9
+            tripsCompleted:
+              type: "number"
+              example: 1420
+            etaMinutes:
+              type: "number"
+              example: 7
+    StartTripDto:
+      type: "object"
+      properties:
+        otp:
+          type: "string"
+          example: "4829"
+          description: "4-digit OTP provided by customer"
+      required:
+        - "otp"
+    CompleteTripDto:
+      type: "object"
+      properties:
+        waitingMinutes:
+          type: "number"
+          example: 15
+          default: 0
+        notes:
+          type: "string"
+    RateTripDto:
+      type: "object"
+      properties:
+        rating:
+          type: "number"
+          minimum: 1
+          maximum: 5
+          example: 5
+        reviewText:
+          type: "string"
+          example: "Excellent chauffeur service, highly recommended!"
+      required:
+        - "rating"
+    RegisterDriverDto:
+      type: "object"
+      properties:
+        fullName:
+          type: "string"
+          example: "Srinivas Rao"
+        phone:
+          type: "string"
+          example: "+919876543210"
+        email:
+          type: "string"
+          example: "srinivas.rao@gmail.com"
+        experienceYears:
+          type: "number"
+          example: 8
+        transmissionCapability:
+          type: "string"
+          enum:
+            - "MANUAL"
+            - "AUTOMATIC"
+            - "BOTH"
+          default: "BOTH"
+        licenseNumber:
+          type: "string"
+          example: "TS0920180012345"
+        licenseExpiry:
+          type: "string"
+          example: "2030-05-31"
+        aadhaarNumber:
+          type: "string"
+          example: "123456789012"
+        preferredAreas:
+          type: "array"
+          items:
+            type: "string"
+          example:
+            - "Gachibowli"
+            - "HITEC City"
+        bankIfsc:
+          type: "string"
+          example: "HDFC0001234"
+        bankAccountNumber:
+          type: "string"
+          example: "50100234567890"
+      required:
+        - "fullName"
+        - "phone"
+        - "experienceYears"
+        - "transmissionCapability"
+        - "licenseNumber"
+        - "licenseExpiry"
+    UpdateLocationDto:
+      type: "object"
+      properties:
+        latitude:
+          type: "number"
+          example: 17.4435
+        longitude:
+          type: "number"
+          example: 78.3772
+        bearing:
+          type: "number"
+          example: 180
+        speedKmh:
+          type: "number"
+          example: 35.5
+      required:
+        - "latitude"
+        - "longitude"
+    DriverEarningsDto:
+      type: "object"
+      properties:
+        driverId:
+          type: "string"
+          example: "drv_demo_01"
+        totalGrossEarnings:
+          type: "number"
+          example: 18450
+        platformCommissionTotal:
+          type: "number"
+          example: 3690
+        netPayable:
+          type: "number"
+          example: 14760
+        pendingPayout:
+          type: "number"
+          example: 3200
+        tripsCount:
+          type: "number"
+          example: 28
+    CreateOrderDto:
+      type: "object"
+      properties:
+        bookingId:
+          type: "string"
+          example: "bkg_1731000000000"
+        amount:
+          type: "number"
+          example: 649
+      required:
+        - "bookingId"
+        - "amount"
+    VerifyPaymentDto:
+      type: "object"
+      properties:
+        razorpayOrderId:
+          type: "string"
+          example: "order_HYD_987654321"
+        razorpayPaymentId:
+          type: "string"
+          example: "pay_HYD_123456789"
+        razorpaySignature:
+          type: "string"
+          example: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      required:
+        - "razorpayOrderId"
+        - "razorpayPaymentId"
+        - "razorpaySignature"
+    AdminDashboardMetricsDto:
+      type: "object"
+      properties:
+        totalCustomers:
+          type: "number"
+          example: 3240
+        totalDrivers:
+          type: "number"
+          example: 412
+        verifiedDrivers:
+          type: "number"
+          example: 389
+        pendingApprovals:
+          type: "number"
+          example: 23
+        activeTrips:
+          type: "number"
+          example: 47
+        completedBookingsToday:
+          type: "number"
+          example: 164
+        totalRevenueToday:
+          type: "number"
+          example: 118400
+        platformCommissionToday:
+          type: "number"
+          example: 23680
+        city:
+          type: "string"
+          example: "Hyderabad"

@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DRIVERYO — Customer Mobile App Simulator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body { font-family: 'Inter', sans-serif; background: #0b1120; }
+    .device-frame {
+      width: 390px;
+      height: 844px;
+      background: #F5F7FB;
+      border-radius: 48px;
+      box-shadow: 0 25px 60px rgba(0,0,0,0.6), 0 0 0 12px #1e293b, 0 0 0 14px #334155;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .island {
+      width: 120px;
+      height: 28px;
+      background: #000;
+      border-radius: 20px;
+      margin: 8px auto;
+      z-index: 50;
+    }
+    .custom-scroll::-webkit-scrollbar { display: none; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-4">
+
+  <!-- Header Links -->
+  <div class="mb-4 flex items-center space-x-4 text-xs font-semibold text-slate-300">
+    <a href="/" class="hover:text-blue-400">🌐 Website</a>
+    <span>•</span>
+    <a href="/admin" class="hover:text-blue-400">📊 Admin Dashboard</a>
+    <span>•</span>
+    <span class="text-blue-400 bg-blue-900/40 px-2 py-1 rounded">📱 Customer App</span>
+    <span>•</span>
+    <a href="/driver-app" class="hover:text-blue-400">🚗 Driver App</a>
+    <span>•</span>
+    <a href="/docs" class="hover:text-blue-400">📖 Swagger Docs</a>
+  </div>
+
+  <div class="device-frame">
+    <!-- Dynamic Island & Status -->
+    <div class="bg-[#101D35] text-white pt-2 px-6 pb-2">
+      <div class="island"></div>
+      <div class="flex justify-between items-center text-[11px] font-semibold tracking-wider text-slate-300 px-2">
+        <span>9:41</span>
+        <div class="flex items-center space-x-1.5">
+          <i class="fa-solid fa-signal text-[10px]"></i>
+          <i class="fa-solid fa-wifi text-[10px]"></i>
+          <i class="fa-solid fa-battery-full text-[12px]"></i>
+        </div>
+      </div>
+      <!-- App Bar -->
+      <div class="flex justify-between items-center py-2.5">
+        <div class="flex items-center space-x-2">
+          <span class="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center text-white text-xs font-black">DY</span>
+          <span class="font-extrabold text-sm tracking-tight text-white">DRIVERYO <span class="text-blue-400 text-xs font-normal">• Hyderabad</span></span>
+        </div>
+        <div class="flex items-center space-x-2">
+          <button onclick="toggleAuth()" class="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-xs text-slate-300">
+            <i class="fa-regular fa-user"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Screen Container (Tabs) -->
+    <div id="screen-container" class="flex-1 overflow-y-auto custom-scroll p-4 space-y-4">
+
+      <!-- TAB 1: HOME & BOOKING SCREEN -->
+      <div id="tab-home" class="space-y-4">
+        <!-- Location Pill -->
+        <div class="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
+          <div class="flex items-center space-x-2.5 overflow-hidden">
+            <i class="fa-solid fa-location-crosshairs text-blue-600 text-sm"></i>
+            <div class="truncate">
+              <p class="text-[10px] text-slate-400 font-semibold uppercase">Current Location</p>
+              <p class="text-xs font-bold text-slate-800 truncate">HITEC City / Cyber Towers, Hyderabad</p>
+            </div>
+          </div>
+          <span class="text-[10px] text-blue-600 font-bold bg-blue-50 px-2 py-1 rounded-lg">Change</span>
+        </div>
+
+        <!-- Service Selector Pills -->
+        <div>
+          <p class="text-xs font-bold text-slate-800 mb-2">Select Chauffeur Service</p>
+          <div class="grid grid-cols-3 gap-2">
+            <button onclick="selectService('INSTANT', 349, 2)" id="srv-INSTANT" class="srv-btn bg-blue-600 text-white p-2.5 rounded-xl text-center border border-blue-600 shadow-sm">
+              <span class="text-base block">⚡</span>
+              <span class="text-[11px] font-bold block">Instant</span>
+              <span class="text-[9px] opacity-80 block">₹349 (2h)</span>
+            </button>
+            <button onclick="selectService('SCHEDULED', 399, 2)" id="srv-SCHEDULED" class="srv-btn bg-white text-slate-700 p-2.5 rounded-xl text-center border border-slate-200">
+              <span class="text-base block">📅</span>
+              <span class="text-[11px] font-bold block">Scheduled</span>
+              <span class="text-[9px] text-slate-400 block">₹399 (2h)</span>
+            </button>
+            <button onclick="selectService('DAILY', 1199, 8)" id="srv-DAILY" class="srv-btn bg-white text-slate-700 p-2.5 rounded-xl text-center border border-slate-200">
+              <span class="text-base block">🚗</span>
+              <span class="text-[11px] font-bold block">Daily (8h)</span>
+              <span class="text-[9px] text-slate-400 block">₹1,199</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Car Details (Customer Owned) -->
+        <div class="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-800">Your Vehicle Transmission</span>
+            <span class="text-[10px] text-amber-600 font-semibold bg-amber-50 px-2 py-0.5 rounded">Customer Car</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <button onclick="selectTransmission('MANUAL')" id="trans-MANUAL" class="trans-btn bg-blue-600 text-white py-2 rounded-xl text-xs font-bold border border-blue-600">
+              ⚙️ Manual Gear
+            </button>
+            <button onclick="selectTransmission('AUTOMATIC')" id="trans-AUTOMATIC" class="trans-btn bg-slate-50 text-slate-700 py-2 rounded-xl text-xs font-bold border border-slate-200">
+              🚗 Automatic (AMT/CVT)
+            </button>
+          </div>
+          <div>
+            <label class="text-[11px] font-semibold text-slate-500 block mb-1">Vehicle Category</label>
+            <select id="vehicle-cat" onchange="calculateFare()" class="w-full text-xs font-medium bg-slate-50 border border-slate-200 rounded-xl p-2.5 focus:outline-none">
+              <option value="SEDAN">Sedan (City, Verna, Ciaz, Dzire)</option>
+              <option value="HATCHBACK">Hatchback (Swift, i20, Tiago, Baleno)</option>
+              <option value="SUV">SUV / MUV (Creta, Seltos, Innova, Scorpio)</option>
+              <option value="LUXURY">Luxury (BMW, Mercedes, Audi, Fortuner)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Locations Form -->
+        <div class="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm space-y-2.5">
+          <div class="flex items-center space-x-2.5">
+            <i class="fa-solid fa-circle-dot text-emerald-500 text-xs"></i>
+            <input type="text" id="pickup-input" value="Cyber Towers, HITEC City" class="w-full text-xs font-medium text-slate-800 focus:outline-none bg-transparent" placeholder="Pickup location...">
+          </div>
+          <div class="border-t border-slate-100"></div>
+          <div class="flex items-center space-x-2.5">
+            <i class="fa-solid fa-flag-checkered text-blue-600 text-xs"></i>
+            <input type="text" id="dest-input" value="RGIA Shamshabad Airport" class="w-full text-xs font-medium text-slate-800 focus:outline-none bg-transparent" placeholder="Destination...">
+          </div>
+        </div>
+
+        <!-- Coupon Card -->
+        <div class="flex space-x-2">
+          <input type="text" id="coupon-input" value="FIRSTTRIP" class="flex-1 bg-white border border-slate-200 text-xs font-bold uppercase rounded-xl px-3 py-2 text-slate-700" placeholder="Coupon Code">
+          <button onclick="calculateFare()" class="bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-xl">Apply</button>
+        </div>
+
+        <!-- Fare Breakdown Pill -->
+        <div class="bg-[#EAF1FF] p-3.5 rounded-2xl border border-blue-200 flex justify-between items-center">
+          <div>
+            <span class="text-xs font-extrabold text-[#101D35] block">Estimated Total Fare</span>
+            <span class="text-[10px] text-slate-500 block" id="fare-details">Base ₹349 • GST ₹63 • Coupon -₹100</span>
+          </div>
+          <span class="text-2xl font-black text-blue-600" id="total-fare">₹412</span>
+        </div>
+
+        <!-- CTA Button -->
+        <button onclick="requestChauffeur()" id="btn-request" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-2xl shadow-lg shadow-blue-500/25 flex items-center justify-center space-x-2 text-sm">
+          <span>Request Verified Driver</span>
+          <i class="fa-solid fa-arrow-right text-xs"></i>
+        </button>
+      </div>
+
+      <!-- TAB 2: LIVE TRACKING & TRIP SCREEN -->
+      <div id="tab-tracking" class="hidden space-y-4">
+        <!-- Live Status Pill -->
+        <div class="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
+          <div>
+            <span class="text-[10px] font-bold text-slate-400 block uppercase">Booking <span id="track-bkg-id">#DY-849201</span></span>
+            <span class="text-xs font-bold text-emerald-600 flex items-center gap-1.5" id="track-status-pill">
+              <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span id="track-status-text">Driver Arriving (4 mins)</span>
+            </span>
+          </div>
+          <button onclick="triggerSos()" class="bg-red-50 text-red-600 text-xs font-bold px-2.5 py-1.5 rounded-xl border border-red-200 flex items-center gap-1">
+            <i class="fa-solid fa-shield-halved"></i> SOS
+          </button>
+        </div>
+
+        <!-- Map Simulation -->
+        <div class="h-44 bg-slate-200 rounded-2xl overflow-hidden relative border border-slate-200 flex items-center justify-center">
+          <div class="absolute inset-0 bg-cover bg-center opacity-40" style="background-image: url('https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&w=600&q=80');"></div>
+          <div class="relative z-10 text-center">
+            <div class="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center mx-auto mb-1.5 shadow-lg animate-bounce">
+              <i class="fa-solid fa-car text-sm"></i>
+            </div>
+            <span class="text-[11px] font-extrabold text-slate-900 bg-white/90 px-2.5 py-1 rounded-full shadow">HITEC City ➔ RGIA</span>
+          </div>
+        </div>
+
+        <!-- Mandatory OTP Box -->
+        <div class="bg-amber-50 p-3.5 rounded-2xl border border-amber-300 flex justify-between items-center">
+          <div>
+            <p class="text-xs font-bold text-amber-900">Trip Start Security OTP</p>
+            <p class="text-[10px] text-amber-700">Share with driver only after vehicle inspection</p>
+          </div>
+          <span class="text-2xl font-black text-amber-900 tracking-widest bg-amber-200/60 px-3 py-1 rounded-xl" id="track-otp">7821</span>
+        </div>
+
+        <!-- Driver Profile -->
+        <div class="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm">RR</div>
+            <div>
+              <p class="text-xs font-bold text-slate-800" id="driver-name">Ramesh Reddy</p>
+              <p class="text-[10px] text-slate-500">4.9 ★ (342 trips) • Verified</p>
+            </div>
+          </div>
+          <a href="tel:+919848011223" class="w-9 h-9 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center text-sm">
+            <i class="fa-solid fa-phone"></i>
+          </a>
+        </div>
+
+        <!-- Testing Simulation Steppers -->
+        <div class="bg-slate-100 p-3 rounded-2xl space-y-2">
+          <p class="text-[10px] font-bold text-slate-500 uppercase">Simulator Test Steps</p>
+          <div class="grid grid-cols-3 gap-1.5">
+            <button onclick="simStatus('DRIVER_ARRIVED', 'Chauffeur at your car')" class="bg-white text-slate-700 text-[10px] font-bold py-1.5 rounded-lg border">1. Arrived</button>
+            <button onclick="simStatus('TRIP_STARTED', 'Trip Meter Active')" class="bg-white text-slate-700 text-[10px] font-bold py-1.5 rounded-lg border">2. Start OTP</button>
+            <button onclick="simStatus('TRIP_COMPLETED', 'Trip Complete • Pay ₹412')" class="bg-white text-slate-700 text-[10px] font-bold py-1.5 rounded-lg border">3. Complete</button>
+          </div>
+        </div>
+
+        <!-- Payment CTA -->
+        <div id="payment-box" class="hidden">
+          <button onclick="openPaymentModal()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-2xl shadow-lg shadow-emerald-500/25 flex items-center justify-center space-x-2 text-sm">
+            <i class="fa-solid fa-lock text-xs"></i>
+            <span>Pay ₹412 via Razorpay / UPI</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Navigation Bar -->
+    <div class="bg-white border-t border-slate-100 px-6 py-2 flex justify-between items-center text-slate-400">
+      <button onclick="showTab('home')" class="flex flex-col items-center text-blue-600">
+        <i class="fa-solid fa-house text-sm"></i>
+        <span class="text-[9px] font-bold mt-1">Home</span>
+      </button>
+      <button onclick="showTab('tracking')" class="flex flex-col items-center hover:text-blue-600">
+        <i class="fa-solid fa-location-arrow text-sm"></i>
+        <span class="text-[9px] font-bold mt-1">Activity</span>
+      </button>
+      <button onclick="alert('Wallet Balance: ₹500.00')" class="flex flex-col items-center hover:text-blue-600">
+        <i class="fa-solid fa-wallet text-sm"></i>
+        <span class="text-[9px] font-bold mt-1">Wallet</span>
+      </button>
+      <button onclick="alert('Driveryo Hyderabad Helpline: 1800-419-DRV')" class="flex flex-col items-center hover:text-blue-600">
+        <i class="fa-solid fa-headset text-sm"></i>
+        <span class="text-[9px] font-bold mt-1">Support</span>
+      </button>
+    </div>
+  </div>
+
+  <script>
+    const API = '/api/v1';
+    let currentService = 'INSTANT';
+    let currentTransmission = 'MANUAL';
+    let durationHours = 2;
+    let baseRate = 349;
+
+    function selectService(srv, rate, hours) {
+      currentService = srv;
+      baseRate = rate;
+      durationHours = hours;
+      document.querySelectorAll('.srv-btn').forEach(b => {
+        b.className = 'srv-btn bg-white text-slate-700 p-2.5 rounded-xl text-center border border-slate-200';
+      });
+      document.getElementById('srv-' + srv).className = 'srv-btn bg-blue-600 text-white p-2.5 rounded-xl text-center border border-blue-600 shadow-sm';
+      calculateFare();
+    }
+
+    function selectTransmission(trans) {
+      currentTransmission = trans;
+      document.querySelectorAll('.trans-btn').forEach(b => {
+        b.className = 'trans-btn bg-slate-50 text-slate-700 py-2 rounded-xl text-xs font-bold border border-slate-200';
+      });
+      document.getElementById('trans-' + trans).className = 'trans-btn bg-blue-600 text-white py-2 rounded-xl text-xs font-bold border border-blue-600';
+      calculateFare();
+    }
+
+    async function calculateFare() {
+      const coupon = document.getElementById('coupon-input').value.trim();
+      const cat = document.getElementById('vehicle-cat').value;
+      try {
+        const res = await fetch(`${API}/pricing/estimate`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            serviceCategory: currentService,
+            durationHours: durationHours,
+            promoCode: coupon,
+            vehicleTransmission: currentTransmission,
+            vehicleCategory: cat
+          })
+        });
+        const data = await res.json();
+        document.getElementById('total-fare').innerText = '₹' + data.total;
+        document.getElementById('fare-details').innerText = `Base ₹${data.baseFare} • GST ₹${data.gst} • Coupon -₹${data.discount}`;
+      } catch(e) {
+        document.getElementById('total-fare').innerText = '₹412';
+      }
+    }
+
+    async function requestChauffeur() {
+      const btn = document.getElementById('btn-request');
+      btn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> <span>Matching Nearby Driver...</span>`;
+      btn.disabled = true;
+
+      try {
+        const res = await fetch(`${API}/bookings/create`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            customerPhone: '+919876543210',
+            pickupLocation: document.getElementById('pickup-input').value,
+            destinationLocation: document.getElementById('dest-input').value,
+            serviceCategory: currentService,
+            durationHours: durationHours,
+            vehicleTransmission: currentTransmission,
+            vehicleCategory: document.getElementById('vehicle-cat').value,
+            promoCode: document.getElementById('coupon-input').value
+          })
+        });
+        const bkg = await res.json();
+        document.getElementById('track-bkg-id').innerText = '#' + (bkg.bookingNumber || bkg.id);
+        document.getElementById('track-otp').innerText = bkg.otpStartCode || '7821';
+        if (bkg.assignedDriver) {
+          document.getElementById('driver-name').innerText = bkg.assignedDriver.fullName;
+        }
+        showTab('tracking');
+      } catch (e) {
+        showTab('tracking');
+      } finally {
+        btn.innerHTML = `<span>Request Verified Driver</span> <i class="fa-solid fa-arrow-right text-xs"></i>`;
+        btn.disabled = false;
+      }
+    }
+
+    function simStatus(status, label) {
+      document.getElementById('track-status-text').innerText = label;
+      if (status === 'TRIP_COMPLETED') {
+        document.getElementById('payment-box').classList.remove('hidden');
+      }
+    }
+
+    function showTab(tab) {
+      if (tab === 'home') {
+        document.getElementById('tab-home').classList.remove('hidden');
+        document.getElementById('tab-tracking').classList.add('hidden');
+      } else {
+        document.getElementById('tab-home').classList.add('hidden');
+        document.getElementById('tab-tracking').classList.remove('hidden');
+      }
+    }
+
+    function openPaymentModal() {
+      const confirmed = confirm('Pay ₹412 via Razorpay UPI / Cards?');
+      if (confirmed) {
+        alert('✅ Payment of ₹412 verified via Razorpay! Digital invoice dispatched.');
+        const rating = prompt('Rate your chauffeur Ramesh Reddy (1 to 5 stars):', '5');
+        if (rating) {
+          alert('Thank you for rating Driveryo 5 stars!');
+        }
+        showTab('home');
+      }
+    }
+
+    function triggerSos() {
+      alert('🚨 EMERGENCY ALERT ACTIVATED: Coordinates transmitted to Hyderabad Police & Driveryo Command Center.');
+    }
+
+    function toggleAuth() {
+      const phone = prompt('Enter 10-digit Indian mobile number for OTP login:', '9876543210');
+      if (phone) {
+        alert(`SMS OTP dispatched to +91 ${phone} (Demo Code: 5555)`);
+      }
+    }
+  </script>
+</body>
+</html>

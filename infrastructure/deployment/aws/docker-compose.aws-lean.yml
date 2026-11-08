@@ -1,0 +1,135 @@
+version: '3.8'
+
+# ==============================================================================
+# DRIVERYO COST-OPTIMIZED AWS 3-TIER PRODUCTION STACK
+# Target: AWS Lightsail / EC2 Ubuntu (Budget: $5 - $10 / month / ~₹420 - ₹840/mo)
+# Region: ap-south-1 (Mumbai / Hyderabad)
+# ==============================================================================
+
+services:
+  # ============================================================================
+  # EDGE & INGRESS: Caddy Reverse Proxy (Auto SSL via Let's Encrypt, Zero ALB Cost)
+  # ============================================================================
+  caddy:
+    image: caddy:2-alpine
+    container_name: driveryo_caddy_ingress
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+      - website
+      - admin
+    networks:
+      - driveryo-aws-net
+
+  # ============================================================================
+  # TIER 2: APPLICATION TIER (NestJS API Engine & WebSocket Radar)
+  # ============================================================================
+  backend:
+    build:
+      context: ../../
+      dockerfile: infrastructure/docker/Dockerfile.backend
+    container_name: driveryo_backend_aws
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+      - DATABASE_URL=postgresql://driveryo_user:SecureAwsPassword2026!@postgres:5432/driveryo_prod?schema=public
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=driveryo_aws_mumbai_secret_key_2026
+      # AWS S3 Integration for Driver KYC
+      - AWS_REGION=ap-south-1
+      - AWS_S3_BUCKET=driveryo-kyc-documents-hyd
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - driveryo-aws-net
+
+  # ============================================================================
+  # TIER 1: PRESENTATION TIER (Customer Website & Admin Operations Console)
+  # ============================================================================
+  website:
+    build:
+      context: ../../
+      dockerfile: infrastructure/docker/Dockerfile.website
+    container_name: driveryo_website_aws
+    restart: always
+    environment:
+      - PORT=3000
+      - NEXT_PUBLIC_API_URL=https://${DOMAIN_API:-api.driveryo.com}/api/v1
+    depends_on:
+      - backend
+    networks:
+      - driveryo-aws-net
+
+  admin:
+    build:
+      context: ../../
+      dockerfile: infrastructure/docker/Dockerfile.admin
+    container_name: driveryo_admin_aws
+    restart: always
+    environment:
+      - PORT=3000
+      - NEXT_PUBLIC_API_URL=https://${DOMAIN_API:-api.driveryo.com}/api/v1
+    depends_on:
+      - backend
+    networks:
+      - driveryo-aws-net
+
+  # ============================================================================
+  # TIER 3: DATA & PERSISTENCE TIER (PostgreSQL 16 & Redis 7)
+  # ============================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: driveryo_postgres_aws
+    restart: always
+    environment:
+      POSTGRES_USER: driveryo_user
+      POSTGRES_PASSWORD: SecureAwsPassword2026!
+      POSTGRES_DB: driveryo_prod
+    volumes:
+      - postgres_aws_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U driveryo_user -d driveryo_prod"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - driveryo-aws-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: driveryo_redis_aws
+    restart: always
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_aws_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - driveryo-aws-net
+
+networks:
+  driveryo-aws-net:
+    driver: bridge
+
+volumes:
+  postgres_aws_data:
+  redis_aws_data:
+  caddy_data:
+  caddy_config:

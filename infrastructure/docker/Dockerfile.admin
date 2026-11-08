@@ -1,0 +1,19 @@
+FROM node:20-alpine AS builder
+WORKDIR /app
+RUN npm install -g pnpm
+COPY package.json pnpm-workspace.yaml ./
+COPY apps/admin/package.json ./apps/admin/
+COPY packages/ ./packages/
+RUN pnpm install --filter @driveryo/admin...
+COPY apps/admin/ ./apps/admin/
+RUN pnpm --filter @driveryo/admin build
+
+FROM node:20-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=builder /app/apps/admin/.next/standalone ./
+COPY --from=builder /app/apps/admin/public ./public
+COPY --from=builder /app/apps/admin/.next/static ./.next/static
+
+EXPOSE 3001
+CMD ["node", "server.js"]

@@ -1,0 +1,31 @@
+{
+  "name": "driveryo-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Driveryo - Professional Driver Booking Ecosystem for Customer-Owned Vehicles",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "node scripts/dev.js",
+    "build": "pnpm --recursive run build",
+    "test": "node scripts/test-runner.js",
+    "lint": "pnpm --recursive run lint",
+    "prisma:generate": "pnpm --filter backend prisma generate",
+    "prisma:migrate": "pnpm --filter backend prisma migrate dev",
+    "seed": "node scripts/seed-db.js"
+  },
+  "keywords": [
+    "driveryo",
+    "chauffeur",
+    "driver-on-demand",
+    "hyderabad",
+    "car-driver"
+  ],
+  "author": "Driveryo Engineering Team <engineering@driveryo.com>",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}

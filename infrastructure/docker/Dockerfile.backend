@@ -1,0 +1,22 @@
+# Build stage
+FROM node:20-alpine AS builder
+WORKDIR /app
+RUN npm install -g pnpm
+COPY package.json pnpm-workspace.yaml ./
+COPY apps/backend/package.json ./apps/backend/
+COPY packages/ ./packages/
+RUN pnpm install --filter @driveryo/backend...
+COPY apps/backend/ ./apps/backend/
+RUN pnpm --filter @driveryo/backend build
+
+# Production runtime stage
+FROM node:20-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+RUN npm install -g pnpm
+COPY --from=builder /app/apps/backend/dist ./dist
+COPY --from=builder /app/apps/backend/node_modules ./node_modules
+COPY --from=builder /app/apps/backend/package.json ./package.json
+
+EXPOSE 4000
+CMD ["node", "dist/main.js"]

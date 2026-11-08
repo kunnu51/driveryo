@@ -1,0 +1,152 @@
+name: Build DRIVERYO Mobile Apps (Android APK & iOS)
+
+on:
+  push:
+    branches: [ main, master, release/** ]
+    paths:
+      - 'apps/customer-mobile/**'
+      - 'apps/driver-mobile/**'
+      - '.github/workflows/build-mobile.yml'
+  workflow_dispatch:
+    inputs:
+      build_target:
+        description: 'Choose targets to compile'
+        required: true
+        default: 'both'
+        type: choice
+        options:
+          - 'both'
+          - 'customer-only'
+          - 'driver-only'
+
+permissions:
+  contents: write
+
+jobs:
+  # =========================================================================
+  # 1. ANDROID RELEASE APK & APP BUNDLE (.AAB) BUILD
+  # =========================================================================
+  build-android:
+    name: Build Android APK (${{ matrix.app_name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app_id: 'customer-mobile'
+            app_name: 'Driveryo Customer App'
+            package_name: 'com.driveryo.customer'
+          - app_id: 'driver-mobile'
+            app_name: 'Driveryo Driver App'
+            package_name: 'com.driveryo.driver'
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java Development Kit (JDK 17)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Set up Flutter SDK (Stable Channel)
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.x'
+          channel: 'stable'
+          cache: true
+
+      - name: Flutter Pre-cache & Doctor
+        run: |
+          flutter precache --android
+          flutter doctor -v
+
+      - name: Install Flutter Dependencies (${{ matrix.app_name }})
+        working-directory: apps/${{ matrix.app_id }}
+        run: flutter pub get
+
+      - name: Build Android Release APK (Universal Fat Binary)
+        working-directory: apps/${{ matrix.app_id }}
+        run: flutter build apk --release
+
+      - name: Build Android Release App Bundle (Google Play AAB)
+        working-directory: apps/${{ matrix.app_id }}
+        run: flutter build appbundle --release
+
+      - name: Upload Android Release APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.app_id }}-release-apk
+          path: apps/${{ matrix.app_id }}/build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 14
+
+      - name: Upload Android Play Store AAB Bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.app_id }}-google-play-bundle
+          path: apps/${{ matrix.app_id }}/build/app/outputs/bundle/release/app-release.aab
+          retention-days: 14
+
+  # =========================================================================
+  # 2. APPLE iOS ARCHIVE & RUNNER (.IPA) BUILD (macOS Runner)
+  # =========================================================================
+  build-ios:
+    name: Build iOS Archive (${{ matrix.app_name }})
+    runs-on: macos-14
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app_id: 'customer-mobile'
+            app_name: 'Driveryo Customer App'
+            bundle_id: 'com.driveryo.customer'
+          - app_id: 'driver-mobile'
+            app_name: 'Driveryo Driver App'
+            bundle_id: 'com.driveryo.driver'
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '15.3'
+
+      - name: Set up Flutter SDK (Stable Channel)
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.x'
+          channel: 'stable'
+          cache: true
+
+      - name: Install CocoaPods
+        run: sudo gem install cocoapods
+
+      - name: Install Flutter Dependencies (${{ matrix.app_name }})
+        working-directory: apps/${{ matrix.app_id }}
+        run: flutter pub get
+
+      - name: Install CocoaPods Pods
+        working-directory: apps/${{ matrix.app_id }}/ios
+        run: pod install --repo-update
+
+      - name: Build iOS Application (Release, No CodeSign for CI)
+        working-directory: apps/${{ matrix.app_id }}
+        run: flutter build ios --release --no-codesign
+
+      - name: Package iOS App into Payload Archive (.zip / .ipa ready)
+        run: |
+          mkdir -p apps/${{ matrix.app_id }}/build/ios/Payload
+          cp -r apps/${{ matrix.app_id }}/build/ios/iphoneos/Runner.app apps/${{ matrix.app_id }}/build/ios/Payload/
+          cd apps/${{ matrix.app_id }}/build/ios
+          zip -r ${{ matrix.app_id }}-ios-payload.zip Payload
+
+      - name: Upload iOS Payload Archive Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.app_id }}-ios-payload
+          path: apps/${{ matrix.app_id }}/build/ios/${{ matrix.app_id }}-ios-payload.zip
+          retention-days: 14

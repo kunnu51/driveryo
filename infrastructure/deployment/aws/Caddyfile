@@ -1,0 +1,30 @@
+# ==============================================================================
+# DRIVERYO EDGE CADDY CONFIGURATION (AUTOMATIC FREE HTTPS / SSL)
+# ==============================================================================
+
+# Customer Facing Website
+{$DOMAIN_WEB:driveryo.com} {
+    encode gzip zstd
+    reverse_proxy website:3000
+}
+
+# Operations Admin Dashboard
+{$DOMAIN_ADMIN:admin.driveryo.com} {
+    encode gzip zstd
+    reverse_proxy admin:3000
+}
+
+# Backend REST API & Real-time WebSockets
+{$DOMAIN_API:api.driveryo.com} {
+    encode gzip zstd
+    
+    # Handle WebSockets for live driver radar
+    @websockets {
+        header Connection *Upgrade*
+        header Upgrade    websocket
+    }
+    reverse_proxy @websockets backend:4000
+
+    # Handle standard REST API calls
+    reverse_proxy backend:4000
+}
